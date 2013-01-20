@@ -67,25 +67,27 @@ When COLLECT-ATTRS is t, then collect attributes rather than values."
   "Compare ATTRS and ATTRS2.  If ATTRS2 has all the attributes
 specified with ATTRS, with its values matches to regexp of ATTRS,
 then return t.  Otherwise, return nil."
-  (loop for (name . val) in attrs
-        for val2 = (assoc-default name attrs2)
-        always (string-match val val2)))
+  (if attrs2
+      (loop for (name . val) in attrs
+            for val2 = (assoc-default name attrs2)
+            always (string-match val val2))))
 
 ;;; misc functions
 
 (defun bib-entry (table)
   "create bibtex entry from hashTABLE."
   (with-temp-buffer
-    (bibtex-mode)
-    (insert "@" (car (gethash '=type= table)) "{" (car (gethash '=key= table)))
-    (maphash (lambda (name val) 
-      (unless (member name '(=key= =type=))
-        (insert ",\n" (symbol-name name) "={" (bib-concat val) "}")))
-        table)
-    (insert "\n}")
-    (goto-char (point-min))
-    (bibtex-clean-entry)
-    (buffer-string)))
+    (let (bibtex-files) ;; make this variable empty to avoid key checki.
+      (bibtex-mode)
+      (insert "@" (car (gethash '=type= table)) "{" (car (gethash '=key= table)))
+      (maphash (lambda (name val) 
+        (unless (member name '(=key= =type=))
+          (insert ",\n" (symbol-name name) "={" (bib-concat val) "}")))
+               table)
+      (insert "\n}")
+      (goto-char (point-min))
+      (bibtex-clean-entry)
+      (buffer-string))))
 
 (defun bib-concat (list)
   (mapconcat 'identity list " and "))
@@ -96,7 +98,7 @@ then return t.  Otherwise, return nil."
     (with-temp-buffer 
       (insert (ucs-normalize-NFKC-string text))
       (goto-char (point-min))
-      (while (re-search-forward "[ -〿]" nil t) (replace-match ""))
+      (while (re-search-forward "[,\" -〿]" nil t) (replace-match ""))
       (goto-char (point-min))
       (forward-word)
       (buffer-substring (point-min) (point)))))
@@ -107,7 +109,7 @@ then return t.  Otherwise, return nil."
   "Convert ISBN to ISBN13 w/o hyphen."
   (let ((isbn (replace-regexp-in-string "-" "" isbn)))
     (if (string-match "^[0-9]\\{9\\}[0-9X]$" isbn)
-        (bibtex-isbn13 isbn)
+        (bib-isbn13 isbn)
       (if (string-match "^[0-9]\\{13\\}$" isbn) isbn
         (error "Not proper ISBN format! -- %s" isbn)))))
 

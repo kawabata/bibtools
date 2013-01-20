@@ -1,0 +1,72 @@
+* BibTools
+
+  BibTools let you retrieve bibliographic data from ISBN or title, 
+  and converts them to BibLaTeX format.
+  
+  It uses National Diet Library of Japan or Library of Congress in the U.S.
+  
+** init.el の設定
+
+   BibLaTeXのソートが正しく行われるよう、init.el に以下の設定を追加してください。
+  
+  : (add-hook 'bibtex-mode-hook
+  :           (lambda () (setq outline-regexp "[ \t]*title"
+  :                            ;; fill はさせない。
+  :                            fill-column 1000)))
+  : (let ((misc (assoc-default "Misc" bibtex-biblatex-entry-alist))
+  :       (types '("artwork" "audio" "bibnote" "commentary" "image" "jurisdiction"
+  :               "legislation" "legal" "letter" "movie" "music" "performance" "review"
+  :               "softare" "standard" "video" "map")))
+  :   (dolist (type types)
+  :     (add-to-list 'bibtex-biblatex-entry-alist
+  :                  (cons type misc))))
+  : (bibtex-set-dialect 'biblatex)
+  : (setq bibtex-entry-format '(opt-or-alts numerical-fields whitespace
+  :       inherit-booktitle last-comma delimiters unify-case sort-fields))
+
+   bibtex-entry-format には required-fields は含めないでください。（エラーになります。）
+
+** bib-ndl-query-url のパラメータについて
+
+   - maximumRecords=20に設定されていますが、必要に応じて変更してください。
+
+** 検索について
+
+   詳細は「国立国会図書館サーチ　外部提供インタフェース仕様書」を参照してください。
+   以下は例。
+
+   プログラムで利用する場合：
+   : (bib-ndl "(creator exact 夏目漱石) AND (from=2010-01-01)")
+
+   BibTeXファイルに挿入する場合：
+   : (insert (mapconcat 'identity (bib-ndl "(title=成田新幹線) AND (mediatype=2)") "\n\n"))
+
+** トラブルシューティング
+
+   うまく動作しない場合は bib-debug を tにして *Messages* バッファを確認します。
+
+** 実行例
+
+   : (bib-ndl-isbn "4150105928")
+   : ("@Book{Asimov_第二ファウンデーション,
+   :   author =    {Asimov, Isaac, 1920-1992},
+   :   title =     {第二ファウンデーション : 銀河帝国興亡史3},
+   :   date =      {1984.12},
+   :   translator = {岡部宏之},
+   :   language =  {jpn},
+   :   series =    {ハヤカワ文庫. SF},
+   :   publisher = {早川書房},
+   :   location =  {東京},
+   :   isbn =      4150105928,
+   :   url =       {http://id.ndl.go.jp/jpno/85026435},
+   :   jpno =      85026435,
+   :   sorttitle = {ダイニ ファウンデーション},
+   :   country =   {JP},
+   :   price =     {420円 (税込)},
+   :   extent =    {366p ; 16cm}}")
+   :     ")
+
+** そのほか
+
+   大量の書誌データができてしまった場合は、ebibで閲覧・検索すると便利です。
+   ebibはELPAでインストールできます。
