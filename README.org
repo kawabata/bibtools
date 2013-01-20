@@ -32,14 +32,10 @@
 
 ** 検索について
 
-   詳細は「国立国会図書館サーチ　外部提供インタフェース仕様書」を参照してください。
-   以下は例。
+   基本は M-x bib-ndl-bib-buffer で行います。
 
-   プログラムで利用する場合：
-   : (bib-ndl "(creator exact 夏目漱石) AND (from=2010-01-01)")
-
-   BibTeXファイルに挿入する場合：
-   : (insert (mapconcat 'identity (bib-ndl "(title=成田新幹線) AND (mediatype=2)") "\n\n"))
+   ISBNから検索したり、手動で行う場合は、「国立国会図書館サーチ　外部
+   提供インタフェース仕様書」を参照してください。以下は例。
 
 ** トラブルシューティング
 
@@ -47,13 +43,12 @@
 
 ** 実行例
 
-   : (bib-ndl-isbn "4150105928")
-   : ("@Book{Asimov_第二ファウンデーション,
+   : M-: (bib-ndl-query-buffer "(isbn=4150105928)")
+   : @Book{Asimov_第二ファウンデーション,
    :   author =    {Asimov, Isaac, 1920-1992},
    :   title =     {第二ファウンデーション : 銀河帝国興亡史3},
    :   date =      {1984.12},
    :   translator = {岡部宏之},
-   :   language =  {jpn},
    :   series =    {ハヤカワ文庫. SF},
    :   publisher = {早川書房},
    :   location =  {東京},
@@ -61,12 +56,7 @@
    :   url =       {http://id.ndl.go.jp/jpno/85026435},
    :   jpno =      85026435,
    :   sorttitle = {ダイニ ファウンデーション},
-   :   country =   {JP},
+   :   ndc =       933,
+   :   ndlc =      {KS151},
    :   price =     {420円 (税込)},
-   :   extent =    {366p ; 16cm}}")
-   :     ")
-
-** そのほか
-
-   大量の書誌データができてしまった場合は、ebibで閲覧・検索すると便利です。
-   ebibはELPAでインストールできます。
+   :   extent =    {366p ; 16cm}}

@@ -98,7 +98,7 @@
     (abstract   dcterms:abstract)
     (note       dcterms:description)
     ;; 以下の値は属性値を取るので当面は使わない。
-    (ndc        (dcterms:subject ((rdf:resource . "http://id.ndl.go.jp/class/ndc8")) nil t))
+    (ndc8       (dc:subject ((rdf:datatype . "http://ndl.go.jp/dcndl/terms/NDC8"))))
     (ndc        (dcterms:subject ((rdf:resource . "http://id.ndl.go.jp/class/ndc9")) nil t))
     (ndlc       (dcterms:subject ((rdf:resource . "http://id.ndl.go.jp/class/ndlc")) nil t))
     (call       dcndl:callNumber)
@@ -173,6 +173,7 @@
          (language   (gethash 'language table))
          (url        (gethash 'url table))
          (material   (gethash 'material table))
+         (ndc8       (gethash 'ndc8 table))
          (ndc        (gethash 'ndc table))
          (ndlc       (gethash 'ndlc table))
          ;; material は、 ((rdf:resource
@@ -241,21 +242,24 @@
     (remhash 'year table)
     (puthash 'date (or year date) table)
     ;; ndc/ndlc
-    (if ndc
-        (puthash 'ndc (list 
-                       (replace-regexp-in-string
-                        "^.+/\\([^/]+\\)$" "\\1"
-                        (assoc-default 'rdf:resource ndc)
-                        nil)) table))
-    (if ndlc
-        (puthash 'ndlc (list 
-                        (replace-regexp-in-string
-                         "^.+/\\([^/]+\\)$" "\\1" 
-                         (assoc-default 'rdf:resource ndlc)
-                         nil)) table))
+    (when ndc8
+      (remhash 'ndc8 table)
+      (puthash 'ndc ndc8 table))
+    (when ndc
+      (puthash 'ndc (list 
+                     (replace-regexp-in-string
+                      "^.+/\\([^/]+\\)$" "\\1"
+                      (assoc-default 'rdf:resource ndc)
+                      nil)) table))
+    (when ndlc
+      (puthash 'ndlc (list 
+                      (replace-regexp-in-string
+                       "^.+/\\([^/]+\\)$" "\\1" 
+                       (assoc-default 'rdf:resource ndlc)
+                       nil)) table))
     ;; language, countryが日本なら削除
-    (if (equal language "jpn") (remhash 'language table))
-    (if (equal country "JP") (remhash 'country table))
+    (if (equal language '("jpn")) (remhash 'language table))
+    (if (equal country '("JP")) (remhash 'country table))
     ;; materials
     (remhash 'material table)
     (puthash '=type= (list =type=) table)
@@ -288,6 +292,11 @@
   ;(bib-ndl (concat "(isbn=" (bib-normalize-isbn isbn) ")")))
   (bib-ndl (concat "(isbn=" isbn ")")))
 
+(defun bib-ndl-query-buffer (query)
+  (switch-to-buffer (get-buffer-create "*BibLaTeX*"))
+  (bibtex-mode)
+  (insert (mapconcat 'identity (bib-ndl query) "\n\n") "\n\n"))
+
 (defvar bib-ndl-mediatype
   '((1 . "book")
     (2 . "article")
@@ -299,6 +308,7 @@
     (8 . "challenged")
     (9 . "legislature")))
 
+;;###autoload
 (defun bib-ndl-bib-buffer (title &optional creator publisher year mediatype)
   (interactive 
    (list (read-string "Title (=XXX:exact, ^XXX:forward-match)? ")
@@ -339,8 +349,6 @@
           (push (format "until=%s-12-31" until) result))
       (if mediatype (push mediatype result))
       (setq query (concat "(" (mapconcat 'identity result ") AND (") ")"))
-      (switch-to-buffer (get-buffer-create "*BibTeX*"))
-      (bibtex-mode)
-      (insert (mapconcat 'identity (bib-ndl query) "\n\n") "\n\n"))))
+      (bib-ndl-query-buffer query))))
 
 (provide 'bib-ndl)
