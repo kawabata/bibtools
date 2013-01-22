@@ -14,6 +14,26 @@
 
 (defvar bib-debug t)
 
+;; read-string history
+(defvar bib-xml-title nil)
+(defvar bib-xml-creator nil)
+(defvar bib-xml-publisher nil)
+(defvar bib-xml-year nil)
+
+;; expand BibLaTeX entry-alist to support non-standard formats.
+(let ((misc (assoc-default "Misc" bibtex-biblatex-entry-alist))
+      (types '("artwork" "audio" "bibnote" "commentary" "image" "jurisdiction"
+              "legislation" "legal" "letter" "movie" "music" "performance" "review"
+              "softare" "standard" "video" "map")))
+  (dolist (type types)
+    (add-to-list 'bibtex-biblatex-entry-alist
+                 (cons type misc))))
+;; select BibLaTeX for bibtex settings.
+(bibtex-set-dialect 'biblatex)
+;; ensure that 'required-fields is not included in `bibtex-entry-format'
+(when (memq 'required-fields bibtex-entry-format)
+  (error "Please exclude 'required-fields from bibtex-entry-format: %s !" bibtex-entry-format))
+
 (defun bib-xml-query (query)
   "QUERY to the server with URL, then parse returned XML."
   (let* ((buffer 
@@ -74,16 +94,40 @@ then return t.  Otherwise, return nil."
 
 ;;; misc functions
 
+(defun bib-aggregate-table-entry (name table)
+  "aggregate NAME0 NAME1 NAME2 ... NAME9 entries in TABLE to NAME in TABLE as list."
+  (puthash 
+   (intern name)
+   (loop with result = nil
+         for i from 0 to 9
+         for symbol = (intern (format "%s%d" name i))
+         for entry = (gethash symbol table)
+         do (remhash symbol table)
+         if entry
+         do (setq result (append result entry))
+         end
+         finally return result)
+   table) table)
+
+;; (bib-aggregate-table-entry "name" #s(hash-table data (name0 ("x") name1 ("y"))))
+;; → #s(hash-table data ( name ("x" "y")))
+
 (defun bib-entry (table)
   "create bibtex entry from hashTABLE."
   (with-temp-buffer
     (let (bibtex-files) ;; make this variable empty to avoid key checki.
       (bibtex-mode)
       (insert "@" (car (gethash '=type= table)) "{" (car (gethash '=key= table)))
-      (maphash (lambda (name val) 
-        (unless (member name '(=key= =type=))
-          (insert ",\n" (symbol-name name) "={" (bib-concat val) "}")))
-               table)
+      (maphash
+       (lambda (name val) 
+         (unless (member name '(=key= =type=))
+           (when val
+             (let ((val (bib-concat val)))
+               ;; escape `"' character
+               (setq val 
+                     (ucs-normalize-NFKC-string (replace-regexp-in-string "\"" "”" val)))
+               (insert ",\n" (symbol-name name) "=\"" val "\"")))))
+       table)
       (insert "\n}")
       (goto-char (point-min))
       (bibtex-clean-entry)
@@ -96,7 +140,7 @@ then return t.  Otherwise, return nil."
   "Retrieve first word of text, without symbolic_punctuational characters U+2000-U+303F"
   (when text
     (with-temp-buffer 
-      (insert (ucs-normalize-NFKC-string text))
+      (insert text)
       (goto-char (point-min))
       (while (re-search-forward "[,\" -〿]" nil t) (replace-match ""))
       (goto-char (point-min))

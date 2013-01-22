@@ -1,18 +1,15 @@
 * BibTools
 
-  BibTools let you retrieve bibliographic data from ISBN or title, 
-  and converts them to BibLaTeX format.
-  
-  It uses National Diet Library of Japan or Library of Congress in the U.S.
+  BibToolsは国会図書館・CiNii・米国議会図書館（予定）にアクセスして
+  BibTeXデータを取り出します。要　Emacs 24。 
   
 ** init.el の設定
 
-   BibLaTeXのソートが正しく行われるよう、init.el に以下の設定を追加してください。
-  
-  : (add-hook 'bibtex-mode-hook
-  :           (lambda () (setq outline-regexp "[ \t]*title"
-  :                            ;; fill はさせない。
-  :                            fill-column 1000)))
+   できる限り多彩な情報を記述できるよう、本ツールでは BibTeXの拡張であ
+   る "BibLaTeX" を前提にしています。データの整形に使用する bibtex.el
+   （Emacs 24 用）は、一部、BibLaTeXに対応していますが、エントリ種類が
+   若干不足しているため、init.el に以下の設定を追加してください。
+   
   : (let ((misc (assoc-default "Misc" bibtex-biblatex-entry-alist))
   :       (types '("artwork" "audio" "bibnote" "commentary" "image" "jurisdiction"
   :               "legislation" "legal" "letter" "movie" "music" "performance" "review"
@@ -24,22 +21,40 @@
   : (setq bibtex-entry-format '(opt-or-alts numerical-fields whitespace
   :       inherit-booktitle last-comma delimiters unify-case sort-fields))
 
-   bibtex-entry-format には required-fields は含めないでください。（エラーになります。）
+   また、以下のような設定をさせると Fillを防いだり、outline-minor-mode
+   で効率良く見たりできます。（基本はRefTeXを推奨します。）
+
+  : (add-hook 'bibtex-mode-hook
+  :           (lambda () (setq outline-regexp "[ \t]*\\(@\\|title\\)"
+  :                            ;; fill はさせない。
+  :                            fill-column 1000)))
+
+   bibtex-entry-format には required-fields は含めないでください。（エ
+   ラーになります。）また、稀にデータベースのAbstractの文面のカッコが対
+   応していない場合があります。その場合、reformat時にエラーになりますが、
+   (setq bibtex-field-delimiters 'double-quotes) とするとエラーを回避で
+   きます。
+
+* bib-ndl
+
+  bib-ndl は、国会図書館のデータベースにアクセスします。
 
 ** bib-ndl-query-url のパラメータについて
 
    - maximumRecords=20に設定されていますが、必要に応じて変更してください。
+
+** トラブルシューティング
+
+   うまく動作しない場合は bib-debug を tにして *Messages* バッファを確
+   認します。また、M-x trace-function → bib-ndl-get-items で入出力を確
+   認できます。
 
 ** 検索について
 
    基本は M-x bib-ndl-bib-buffer で行います。
 
    ISBNから検索したり、手動で行う場合は、「国立国会図書館サーチ　外部
-   提供インタフェース仕様書」を参照してください。以下は例。
-
-** トラブルシューティング
-
-   うまく動作しない場合は bib-debug を tにして *Messages* バッファを確認します。
+   提供インタフェース仕様書」を参照してください。以下に例を示します。
 
 ** 実行例
 
@@ -60,3 +75,32 @@
    :   ndlc =      {KS151},
    :   price =     {420円 (税込)},
    :   extent =    {366p ; 16cm}}
+
+* bib-cinii
+
+  bib-cinii は、CiNii のデータベースにアクセスします。
+
+** 検索について
+
+   基本は、M-x bib-cinii-bib-buffer で行います。
+   手動で行う場合は、bib-cinii-query-buffer 関数を直接呼び出してください。
+
+** 実行例
+
+   : M-: (bib-cinii-query-buffer "title=大漢和辞典&author=橋本")
+   : @Article{橋本_大漢和辞典編纂資料としての,
+   :   author =    "橋本 行洋",
+   :   title =     "『大漢和辞典』編纂資料としての『新撰支那時文辞典』",
+   :   year =      2008,
+   :   volume =    0,
+   :   number =    40,
+   :   pages =     "23--50",
+   :   issn =      "1342467X",
+   :   url =       "http://ci.nii.ac.jp/naid/40016146805",
+   :   publisher = "花園大学文学部"}
+
+* bib-loc
+
+  bib-loc は、米国連邦図書館 LOC のデータベースにアクセスします。
+  現在の機能は暫定です。
+  

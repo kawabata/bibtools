@@ -51,7 +51,7 @@
 
 ;; http://iss.ndl.go.jp/information/wp-content/uploads/2012/08/dcndl_rdf_format_ver.1.1_20111226.pdf
 ;; のうち、biblatexに対応しそうなものだけを選択。
-(defvar bib-ndl-rdf 
+(defvar bib-ndl-path-table 
   '(
     ;; 2-1
     (url     (rdfs:seeAlso ((rdf:resource . "http://id.ndl.go.jp/jpno/")) nil t))
@@ -97,7 +97,6 @@
     ;; 2-75
     (abstract   dcterms:abstract)
     (note       dcterms:description)
-    ;; 以下の値は属性値を取るので当面は使わない。
     (ndc8       (dc:subject ((rdf:datatype . "http://ndl.go.jp/dcndl/terms/NDC8"))))
     (ndc        (dcterms:subject ((rdf:resource . "http://id.ndl.go.jp/class/ndc9")) nil t))
     (ndlc       (dcterms:subject ((rdf:resource . "http://id.ndl.go.jp/class/ndlc")) nil t))
@@ -121,7 +120,7 @@
     (institution dcndl:degreeGrantor foaf:Agent foaf:name)
     ;; 2-113
     (copyright dcndl:rightsHolder) ;; 仕様書はdcterms:rightsHolder。
-    ;; ??
+    ;; 
     (series dcndl:seriesTitle rdf:Description rdf:value)
     ))
 
@@ -131,25 +130,27 @@
 
 ;;; functions
 
+;;; top function
+
 (defun bib-ndl-query (query)
   (bib-xml-query (concat bib-ndl-query-url query)))
 
-(defun bib-ndl-get-rdfs (xml)
+(defun bib-ndl-get-items (query)
   "NDLのXMLデータから、recordDataのrdfのリストを取り出す。"
   ;; query は、recordPacking=xml とすること。
   (remove-if-not
    (lambda (x) (and (listp x) (equal (car x) 'rdf:RDF)))
-   (bib-xml-get xml '(searchRetrieveResponse records record recordData))))
+   (bib-xml-get (bib-ndl-query query)
+                '(searchRetrieveResponse records record recordData))))
 
-(defun bib-ndl-parse-rdf (rdf)
+(defun bib-ndl-parse-items (item)
   "RDFデータから書誌情報を取り出し、ハッシュテーブルで返す。"
-  (let* ((d (bib-xml-get rdf '(rdf:RDF dcndl:BibResource)))
-         (table (make-hash-table))
-         authors author translator)
-    ;; `bib-ndl-rdf' にある指定を順番に処理。
-    (loop for item in bib-ndl-rdf
-          for key = (car item)
-          for path = (cdr item)
+  (let* ((d (bib-xml-get item '(rdf:RDF dcndl:BibResource)))
+         (table (make-hash-table)))
+    ;; `bib-ndl-path-table' にある指定を順番に処理。
+    (loop for key-path in bib-ndl-path-table
+          for key = (car key-path)
+          for path = (cdr key-path)
           for val = (bib-xml-get d path)
           if val
           do (puthash key val table))
@@ -269,57 +270,52 @@
 (defun bib-ndl (query)
   "Queryに従ったBibTeXデータのリストを返す。"
   (if bib-debug (message "debug: query=%s" query))
-  (let* ((xml (bib-ndl-query query))
-         (rdfs (bib-ndl-get-rdfs xml)))
-    (if bib-debug (message "debug: xml=%s" xml))
+  (let* ((rdfs (bib-ndl-get-items query)))
     (if bib-debug (message "debug: rdfs=%s" rdfs))
     (mapcar (lambda (rdf)
               (bib-entry
                (bib-ndl-process-bibdata
-                (bib-ndl-parse-rdf (list rdf)))))
+                (bib-ndl-parse-items (list rdf)))))
             rdfs)))
   
 ;;; サンプルプログラム
 
-(defun bib-ndl-jpno (jpno)
-  (interactive "sJPNO=?")
-  "JPNO番号からBibTeXエントリを生成する。"
-    (bib-ndl (concat "(jpno=" jpno ")")))
-
-(defun bib-ndl-isbn (isbn)
-  (interactive "sISBN=?")
-  "ISBN番号からBibTeXエントリを生成する。"
-  ;(bib-ndl (concat "(isbn=" (bib-normalize-isbn isbn) ")")))
-  (bib-ndl (concat "(isbn=" isbn ")")))
-
 (defun bib-ndl-query-buffer (query)
   (switch-to-buffer (get-buffer-create "*BibLaTeX*"))
   (bibtex-mode)
-  (insert (mapconcat 'identity (bib-ndl query) "\n\n") "\n\n"))
+  (goto-char (point-max))
+  (mapcar (lambda (x) (insert x "\n\n")) (bib-ndl query)))
+
+(defun bib-ndl-isbn (isbn)
+  (interactive "sISBN=? ")
+  "ISBN番号からBibTeXエントリを生成する。"
+  (let ((isbn-norm (bib-normalize-isbn isbn)))
+    (bib-ndl-query-buffer
+     (concat "(isbn=" isbn ") OR (isbn= " isbn-norm ")"))))
 
 (defvar bib-ndl-mediatype
-  '((1 . "book")
-    (2 . "article")
-    (3 . "newspaper")
-    (4 . "kids")
-    (5 . "references")
-    (6 . "digital")
-    (7 . "misc")
-    (8 . "challenged")
-    (9 . "legislature")))
+  '(("" . nil) ;; special
+    ("book" . 1)
+    ("article" . 2)
+    ("newspaper" . 3)
+    ("kids" . 4)
+    ("references" . 5)
+    ("digital" . 6)
+    ("misc" . 7)
+    ("challenged" . 8)
+    ("legislature" . 9)))
 
 ;;###autoload
 (defun bib-ndl-bib-buffer (title &optional creator publisher year mediatype)
+  "タイトル・著者（訳者）・出版社・発行年・種類（本・記事）などから検索する。"
   (interactive 
-   (list (read-string "Title (=XXX:exact, ^XXX:forward-match)? ")
-         (read-string "Creator (=XXX:exact, ^XXX:forward-match)? ")
-         (read-string "Publisher (=XXX:exact, ^XXX:forward-match)? ")
-         (read-string "Year (e.g. 2012-, 1945-1960, etc.)? ")
-         (let ((string
-                (completing-read "Media Type ? " (mapcar 'cdr bib-ndl-mediatype))))
-           (or (car (assoc (string-to-number string) bib-ndl-mediatype))
-               (car (rassoc string bib-ndl-mediatype)))
-           )))
+   (list
+    (read-string "タイトル　 (=XXX:exact, ^XXX:forward-match)? " bib-xml-title)
+    (read-string "著者・訳者 (=XXX:exact, ^XXX:forward-match)? " bib-xml-creator)
+    (read-string "出版社　　 (=XXX:exact, ^XXX:forward-match)? " bib-xml-publisher)
+    (read-string "発行年　　 (e.g. 2012-, 1945-1960, etc.)? "    bib-xml-year)
+    (cdr (rassoc (completing-read "Media Type ? " bib-ndl-mediatype nil t)
+                 bib-ndl-mediatype))))
   (flet ((query-check (name value)
            (cond ((null value) nil)
                  ((equal value "") nil)
